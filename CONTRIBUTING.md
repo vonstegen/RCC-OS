@@ -7,12 +7,15 @@ and the staged-experiment structure of this lab.
 
 ## Branching
 
-- The default branch is `main`. It reflects the current best state
-  of the lab.
-- All work happens on topic branches named after the experiment or
-  change.
-- Work on staged experiments happens under `experiments/<topic>`.
-- Pull requests target `main`.
+The lab uses **lab-flavored Gitflow**. Read
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md) before opening a PR. In
+particular:
+
+- The integration line is `develop`. Default target for new work.
+- The release line is `main`. Receives only `release/*` and `hotfix/*`.
+- Topic branches are `feature/<name>`, `experiment/<stage>-<name>`,
+  `release/<version>`, `hotfix/<name>`, or `upstream-sync/<date>`.
+- Squash-merge is the default.
 
 ## Working with upstream
 
@@ -20,18 +23,19 @@ and the staged-experiment structure of this lab.
 `ResonantOS/2.0.0-alpha` @ `dev`. It is committed into the repo so
 the lab always has a reference architecture at hand.
 
-To pull new upstream changes:
+To pull new upstream changes, branch from `develop`:
 
 ```bash
-git remote add upstream https://github.com/ResonantOS/2.0.0-alpha.git
-git fetch upstream dev
-git checkout -b upstream-sync-YYYY-MM-DD upstream/dev
-# compare baseline/ against upstream/dev and resolve conflicts
+git fetch upstream
+git switch develop
+git pull --ff-only
+git switch -c upstream-sync-YYYY-MM-DD upstream/dev
+# Refresh baseline/, then open a PR upstream-sync-YYYY-MM-DD → develop
 ```
 
-Do **not** modify files inside `baseline/` directly. Any experiment
-that needs to start from upstream code should copy the relevant file
-into `src/`, `clients/`, or `experiments/` first and develop there.
+The `pr-checks` workflow will reject any PR that modifies files
+inside `baseline/` directly. Refresh the snapshot on a dedicated
+upstream-sync branch instead.
 
 ## Commit messages
 
@@ -39,6 +43,22 @@ into `src/`, `clients/`, or `experiments/` first and develop there.
 - First line ≤ 72 characters.
 - Body explains why, not what.
 - Reference the relevant milestone when the change advances one.
+
+## Documentation layer
+
+The lab maintains **two parallel documentation surfaces**:
+
+- [`docs/`](docs/) — short, living Markdown kept in the repo and
+  rendered by GitHub.
+- [`latex/`](latex/) — typeset LaTeX for archival PDFs (goal,
+  milestones, research, decisions, design, architecture, tests).
+
+When you add a new decision, design, milestone, or research note,
+update **both** surfaces. The `pr-checks` workflow verifies the
+Markdown; the `latex-build` workflow builds the PDF tree.
+
+See [`latex/README.md`](latex/README.md) for the LaTeX layout and
+build commands.
 
 ## Code review expectations
 
@@ -48,7 +68,9 @@ into `src/`, `clients/`, or `experiments/` first and develop there.
 - New capability surfaces must come with policy before any code
   that uses them.
 - No commit may weaken the existing ResonantOS security boundary
-  without an explicit decision recorded in `docs/decisions/`.
+  without an explicit decision recorded in
+  [`docs/decisions/`](docs/decisions/).
+- `baseline/` is read-only.
 
 ## Reporting issues
 

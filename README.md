@@ -27,11 +27,36 @@ Agent Control, capability/security boundary — and adds three new architectural
 The browser extension remains a supported client. The historical desktop shells become
 reference implementations of additional clients around the same Core.
 
+## Documentation surfaces
+
+The lab maintains two parallel documentation surfaces. Both are kept
+in sync; the Markdown is authoritative for day-to-day work, the
+LaTeX is the canonical PDF for archival distribution.
+
+- [`docs/`](docs/) — living Markdown: VISION, ARCHITECTURE,
+  MILESTONES, WORKFLOW, decisions, research notes.
+- [`latex/`](latex/) — typeset PDF: single master document with
+  goal, milestones, architecture, design, decisions, research,
+  tests, and deadlines chapters. Built by `make` (TeX Live +
+  latexmk + biber) and via the `latex-build` GitHub workflow.
+
+## Branching model
+
+Lab-flavored Gitflow. Read [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
+
+- `main` is the protected release line.
+- `develop` is the protected integration line.
+- Topics branch off `develop` as `feature/<name>` or
+  `experiment/<stage>-<name>`.
+- `release/<version>` and `hotfix/<name>` are the only paths into
+  `main`.
+
 ## Repository layout
 
 ```text
 baseline/                 Snapshot of ResonantOS/2.0.0-alpha @ dev (this commit)
-docs/                     RCC-OS vision, architecture, milestones, research notes
+docs/                     RCC-OS vision, architecture, milestones, workflow, decisions
+latex/                    Typeset LaTeX layer (goal, milestones, design, research, etc.)
 src/                      RCC-OS native code (Rust + minimal Node)
 clients/                  Future browser, desktop, and CLI clients
 experiments/              Isolated research branches (ternary runtime, model router, etc.)

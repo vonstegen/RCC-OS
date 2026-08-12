@@ -1,0 +1,42 @@
+% !TEX root = main.tex
+% Section 05: Decisions.
+% Source of truth: docs/decisions/.
+
+\chapter{Decisions}
+
+Each architectural decision is recorded in
+\texttt{docs/decisions/} as \texttt{NNNN-short-name.md}. The lab
+treats decisions as append-only; a later decision may supersede an
+earlier one but the original is never deleted.
+
+\section{Decision log}
+
+\begin{longtable}{p{1.6cm}p{6.4cm}p{3.4cm}p{1.6cm}}
+\toprule
+\textbf{Number} & \textbf{Title} & \textbf{Status} & \textbf{Stage} \\
+\midrule
+\adr{0001} & Resonant Core is implemented in Rust & Proposed & 0 \\
+\midrule
+\end{longtable}
+
+\section{Decision templates}
+
+A new decision should follow the structure recorded in
+\texttt{docs/decisions/README.md}:
+
+\begin{enumerate}
+  \item \textbf{Status}: Proposed, Accepted, Superseded.
+  \item \textbf{Date} and \textbf{Deciders}.
+  \item \textbf{Context}: the forces in play.
+  \item \textbf{Decision}: the choice made.
+  \item \textbf{Consequences}: positive and negative.
+  \item \textbf{Alternatives considered}: at least one serious alternative.
+  \item \textbf{Supersedes} / \textbf{Superseded by}: pointers.
+\end{enumerate}
+
+\section{When to record a decision}
+
+A decision is recorded when the answer would not be obvious from
+reading the code or the documentation. Pure implementation details
+do not need an ADR; interface changes, security boundaries, and
+abandoned alternatives do.

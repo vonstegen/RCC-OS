@@ -1,0 +1,51 @@
+% !TEX root = main.tex
+% Section 99: Backmatter.
+
+\chapter{Backmatter}
+
+\section{References}
+
+\printbibliography[heading=none]
+
+\section{Glossary}
+
+\begin{longtable}{p{3.0cm}p{10.4cm}}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+\RCCOS{} & Resonant Cognitive Core Operating System. \\
+ADR & Architectural Decision Record. \\
+Cognitive Core & Always-on small local model. \\
+Living Archive & Governed persistent memory. \\
+Model Fabric & Unified router over local and remote intelligence. \\
+Resonant Core & Deterministic operating substrate. \\
+TCB & Trusted computing base. \\
+Tier (0/1/2) & Locality and capability of a model. \\
+\bottomrule
+\end{longtable}
+
+\section{Document version}
+
+\begin{itemize}
+  \item \textbf{Repository}: \texttt{vonstegen/RCC-OS}
+  \item \textbf{Branch baseline}: \texttt{develop}
+  \item \textbf{Generated}: \today
+\end{itemize}
+
+\section{Colophon}
+
+This document is typeset with \RCCOS{}'s lab document class
+(\texttt{classes/rccos.cls}) on top of the standard \LaTeX{}
+\texttt{book} class, with the \texttt{lmodern} font and
+\texttt{microtype} protrusions. Bibliography is managed with
+\texttt{biblatex} and \texttt{biber} (IEEE style). Cross-references
+are routed through \texttt{cleveref}. Code listings use the
+\texttt{listings} package.
+
+To rebuild locally:
+
+\begin{lstlisting}[language=bash]
+make            # build the PDF into build/main.pdf
+make watch      # rebuild on change
+make spelling   # run ltex prose lint
+\end{lstlisting}

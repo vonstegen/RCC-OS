@@ -1,0 +1,137 @@
+% !TEX root = main.tex
+% Section 03: Architecture.
+% Source of truth: docs/ARCHITECTURE.md.
+
+\chapter{Architecture}
+
+\section{Layered model}
+
+\begin{verbatim}
++------------------------------------------------------------+
+| 5. Experience                                              |
+|    Browser extension . Desktop shell . CLI . future UIs    |
++------------------------------------------------------------+
+| 4. Augmentation                                            |
+|    Agents . Apps . Add-ons . Workflows                     |
++------------------------------------------------------------+
+| 3. Intelligence                                            |
+|    Cognitive Core . Local LLMs . Cloud LLMs                |
++------------------------------------------------------------+
+| 2. Cognitive Infrastructure                                |
+|    Living Archive . Context . Model Fabric                 |
++------------------------------------------------------------+
+| 1. Resonant Core                                           |
+|    Capability engine . Security . IPC . Host OS            |
++------------------------------------------------------------+
+\end{verbatim}
+
+Layer 1 is deterministic software. Layer 3 makes the system
+intelligent. Layers 2 and 4 are policy and orchestration glue.
+
+\section{Resonant Core (Layer 1)}
+
+The Core is the single substrate that all clients (browser, desktop,
+CLI, future UIs) speak to. It is the architectural center of the
+system, not the browser.
+
+Responsibilities:
+\begin{itemize}
+  \item Enforce every capability decision through deterministic code.
+  \item Maintain the local user state root (\texttt{\textasciitilde/ResonantOS\_User} by default).
+  \item Audit every privileged action.
+  \item Hold provider credentials, secrets, and bridge tokens.
+  \item Never depend on any AI component to make a security decision.
+\end{itemize}
+
+Initial implementation: Rust (per \adr{0001}).
+
+\section{Cognitive Infrastructure (Layer 2)}
+
+\begin{itemize}
+  \item \textbf{Living Archive}: governed persistent memory.
+  \item \textbf{Context}: working context assembly for the
+        Cognitive Core.
+  \item \textbf{Model Fabric}: unified router over local and remote
+        intelligence.
+\end{itemize}
+
+The Model Fabric treats every model as a provider with measured
+properties:
+\begin{longtable}{p{2.4cm}p{10.0cm}}
+\toprule
+\textbf{Property} & \textbf{Meaning} \\
+\midrule
+latency & round-trip time for a representative request \\
+cost & currency per million tokens (or per request for embedded models) \\
+privacy & whether the request leaves the host \\
+capability & measured quality on the lab's task suite \\
+memory footprint & peak resident memory during inference \\
+availability & probability the provider is reachable at request time \\
+\bottomrule
+\end{longtable}
+
+\section{Intelligence (Layer 3)}
+
+\begin{itemize}
+  \item \textbf{Cognitive Core}: always-on small local model.
+  \item \textbf{Local LLMs}: larger local specialists (optional).
+  \item \textbf{Remote LLMs}: cloud / corporate / federated models
+        (optional).
+\end{itemize}
+
+The Cognitive Core handles structured requests like:
+
+\begin{lstlisting}[language=json,caption={Example request to the Cognitive Core.}]
+{
+  "task": "route",
+  "input": "Open the budget spreadsheet and summarize it",
+  "available_capabilities": ["filesystem.read", "spreadsheet.inspect"],
+  "available_models": ["core-local", "local-7b", "cloud-gpt"],
+  "context_summary": "..."
+}
+\end{lstlisting}
+
+and returns:
+
+\begin{lstlisting}[language=json,caption={Example response from the Cognitive Core.}]
+{
+  "intent": "summarize_document",
+  "capabilities": ["filesystem.read", "spreadsheet.inspect"],
+  "model_tier": "local",
+  "memory_queries": ["budget-2026", "spreadsheet:budget"]
+}
+\end{lstlisting}
+
+The deterministic Core then validates and executes.
+
+\section{Augmentation (Layer 4)}
+
+\begin{itemize}
+  \item \textbf{Agents}: long-running autonomous workflows.
+  \item \textbf{Apps}: scoped applications.
+  \item \textbf{Add-ons}: third-party extensions.
+  \item \textbf{Workflows}: user-defined multi-step flows.
+\end{itemize}
+
+\section{Experience (Layer 5)}
+
+\begin{itemize}
+  \item \textbf{Browser extension}: Chrome MV3 (carried over from baseline).
+  \item \textbf{Desktop}: Tauri or native shell (new in stage 4).
+  \item \textbf{CLI}: terminal-oriented client.
+  \item \textbf{Mobile}: future.
+\end{itemize}
+
+\section{Open architectural questions}
+
+\begin{enumerate}
+  \item How should the Cognitive Core be trained? ResonantOS-specific
+        fine-tuning of an existing ternary SLM vs.\ an off-the-shelf
+        SLM?
+  \item How is hardware discovery structured --- Rust trait, JSON
+        contract, both?
+  \item Where does IPC terminate? Loopback HTTP is the ResonantOS
+        default; is that the right long-term transport?
+  \item What is the upgrade story for the Cognitive Core model
+        without breaking capability contracts?
+\end{enumerate}
