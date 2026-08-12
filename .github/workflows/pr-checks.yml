@@ -172,6 +172,35 @@ jobs:
             echo "$missing"
             exit 1
           fi
+      - name: Verify docs/ <-> latex/sections/ source-of-truth parity
+        run: |
+          # Every docs/*.md in the four-pair list must be named as
+          # 'Source of truth' by at least one latex/sections/*.tex
+          # file. The Markdown file does not need to reference the
+          # LaTeX file by path; the LaTeX side is the authority.
+          broken=""
+          for md in docs/VISION.md docs/MILESTONES.md docs/ARCHITECTURE.md; do
+            if [ ! -f "$md" ]; then
+              continue
+            fi
+            if ! grep -lqF "Source of truth: $md" latex/sections/*.tex 2>/dev/null; then
+              broken="$broken\n$md is not named as 'Source of truth' by any latex/sections/*.tex file."
+            fi
+          done
+          # Reverse: every latex/sections/*.tex that names a docs/*.md
+          # as 'Source of truth' must reference an existing file.
+          for tex in latex/sections/*.tex; do
+            src=$(echo "$tex" | grep -oE 'docs/[A-Za-z0-9_./-]+\.md' || true)
+            if [ -n "$src" ] && [ ! -f "$src" ]; then
+              broken="$broken\n$tex names $src as Source of truth but that file does not exist."
+            fi
+          done
+          if [ -n "$broken" ]; then
+            echo "::error::docs/ <-> latex/sections/ parity broken:"
+            printf '%b' "$broken"
+            exit 1
+          fi
+
 
   latex-presence:
     name: LaTeX scaffold presence
