@@ -1,0 +1,25 @@
+# CODEOWNERS
+
+# The lab uses a single-maintainer model (see ADR-0002). The
+# required-approving-review count is currently 0; the moment a
+# second maintainer is added, this file is the source of truth
+# for who must approve a PR. Each line is a path pattern and a
+# GitHub user/team handle. The last match wins, so put more
+# specific rules after the catch-all.
+
+# Default: the single maintainer owns everything.
+* @vonstegen
+
+# Workflow changes require explicit review because they
+# control what gets built and which secrets are exposed.
+/.github/workflows/ @vonstegen
+/.github/dependabot.yml @vonstegen
+
+# Decisions are append-only; require a second pair of eyes
+# when a second maintainer joins.
+/docs/decisions/ @vonstegen
+
+# baseline/ is a snapshot of upstream; changes there must be
+# driven by a documented upstream-sync topic branch (see
+# docs/WORKFLOW.md).
+/baseline/ @vonstegen
