@@ -61,6 +61,28 @@ jobs:
           fi
           file build/main.pdf
 
+      - name: Smoke-check PDF content with pdftotext
+        working-directory: latex
+        run: |
+          # A successful build that produced a PDF with all body
+          # text as blank rectangles (missing font, broken
+          # microtype) would still upload. Run pdftotext to extract
+          # the first page of text and assert non-trivial content.
+          set -e
+          text=$(pdftotext -l 1 build/main.pdf - 2>/dev/null || true)
+          if [ -z "$text" ]; then
+            echo "::error::pdftotext extracted no text from build/main.pdf. The PDF may have a broken font or rasterized content."
+            exit 1
+          fi
+          if [ $(printf "%s" "$text" | wc -w) -lt 10 ]; then
+            echo "::error::pdftotext extracted fewer than 10 words from page 1. The PDF may be near-empty."
+            echo "--- extracted text ---"
+            echo "$text"
+            echo "--- end ---"
+            exit 1
+          fi
+          echo "pdftotext smoke check passed: $(printf '%s' "$text" | wc -w) words on page 1."
+
       - name: Upload PDF artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
