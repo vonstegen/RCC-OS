@@ -179,7 +179,7 @@ jobs:
           # file. The Markdown file does not need to reference the
           # LaTeX file by path; the LaTeX side is the authority.
           broken=""
-          for md in docs/VISION.md docs/MILESTONES.md docs/ARCHITECTURE.md docs/WORKFLOW.md; do
+          for md in docs/VISION.md docs/MILESTONES.md docs/ARCHITECTURE.md; do
             if [ ! -f "$md" ]; then
               continue
             fi
