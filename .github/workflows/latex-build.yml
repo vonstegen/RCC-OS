@@ -1,0 +1,67 @@
+name: latex-build
+
+# Builds the LaTeX documentation layer with TeX Live (pdflatex +
+# latexmk + biber) and uploads the resulting PDF as a workflow
+# artifact. Action refs are pinned to 40-char SHAs.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'latex/**'
+      - 'docs/**'
+      - '.github/workflows/latex-build.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'latex/**'
+      - 'docs/**'
+      - '.github/workflows/latex-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build-pdf:
+    name: Build RCC-OS PDF
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-latex-recommended \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
+            texlive-science \
+            texlive-publishers \
+            texlive-bibtex-extra \
+            biber \
+            latexmk \
+            make
+
+      - name: Build
+        working-directory: latex
+        run: make
+
+      - name: Verify PDF was produced
+        working-directory: latex
+        run: |
+          if [ ! -s build/main.pdf ]; then
+            echo "::error::latex build did not produce build/main.pdf"
+            exit 1
+          fi
+          file build/main.pdf
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: rccos-documentation
+          path: latex/build/main.pdf
+          retention-days: 14

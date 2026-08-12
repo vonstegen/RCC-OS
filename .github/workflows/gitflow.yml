@@ -1,0 +1,99 @@
+name: gitflow
+
+# Enforces the lab-flavored Gitflow documented in docs/WORKFLOW.md:
+#   - topic-branch prefix matches the type
+#   - PRs to main originate only from release/* or hotfix/*
+#   - PRs to develop originate only from feature/*, experiment/*, or
+#     upstream-sync/*
+#   - the target branch is either develop or main
+# Action refs are pinned to 40-char SHAs.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  branch-prefix:
+    name: Branch prefix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Validate head branch prefix
+        env:
+          HEAD: ${{ github.head_ref }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ -z "$HEAD" ]; then
+            echo "::error::Head branch is empty (workflow_dispatch?)."
+            exit 1
+          fi
+          case "$HEAD" in
+            feature/*|experiment/*|release/*|hotfix/*|upstream-sync/*)
+              echo "Branch prefix OK: $HEAD"
+              ;;
+            *)
+              echo "::error::Branch '$HEAD' must start with one of:"
+              echo "::error::  feature/, experiment/, release/, hotfix/, upstream-sync/"
+              exit 1
+              ;;
+          esac
+
+      - name: Validate PR target and topic-branch mapping
+        env:
+          HEAD: ${{ github.head_ref }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          case "$BASE" in
+            main)
+              case "$HEAD" in
+                release/*|hotfix/*) echo "PR to main allowed from $HEAD." ;;
+                *) echo "::error::PRs to main must come from release/* or hotfix/* (got $HEAD)."; exit 1 ;;
+              esac
+              ;;
+            develop)
+              case "$HEAD" in
+                feature/*|experiment/*|upstream-sync/*|release/*|hotfix/*) echo "PR to develop allowed from $HEAD." ;;
+                *) echo "::error::PRs to develop must come from feature/*, experiment/*, release/*, hotfix/*, or upstream-sync/* (got $HEAD)."; exit 1 ;;
+              esac
+              ;;
+            *)
+              echo "::error::PR base must be main or develop (got $BASE)."
+              exit 1
+              ;;
+          esac
+
+  experiment-stage:
+    name: Experiment branch references a real stage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Verify experiment/<stage>- branches use a known stage number
+        env:
+          HEAD: ${{ github.head_ref }}
+        run: |
+          case "$HEAD" in
+            experiment/*)
+              stage=$(echo "$HEAD" | sed -E 's#^experiment/([0-9]+)-.*$#\1#')
+              if [ -z "$stage" ] || ! echo "$stage" | grep -Eq '^[0-9]+$'; then
+                echo "::error::Branch '$HEAD' is not in experiment/<stage>-<name> form."
+                exit 1
+              fi
+              if ! grep -qE "^### Stage ${stage} " docs/MILESTONES.md; then
+                echo "::error::Stage $stage is not defined in docs/MILESTONES.md."
+                exit 1
+              fi
+              echo "experiment branch $HEAD references defined stage $stage."
+              ;;
+            *) echo "Not an experiment branch; skipping." ;;
+          esac

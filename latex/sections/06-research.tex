@@ -1,0 +1,68 @@
+% !TEX root = main.tex
+% Section 06: Research.
+% This chapter is the canonical research notebook for the lab.
+
+\chapter{Research}
+
+\section{Status}
+
+This chapter is a working notebook. New entries are added as
+\texttt{NNNN-<topic>.tex} files in \texttt{latex/notes/} and included
+below by reference.
+
+\section{Open questions}
+
+\begin{enumerate}
+  \item What is the smallest Cognitive Core that satisfies the
+        routing-accuracy threshold in Stage 2?
+  \item Does the lab need to train a ResonantOS-specific ternary
+        model, or is BitNet b1.58 2B4T a sufficient starting point?
+  \item How does the Cognitive Core behave under adversarial
+        prompts? (See \texttt{docs/notes/adversarial-prompts.tex}
+        for the threat model.)
+  \item Can the deterministic Core be hardened to a small TCB
+        suitable for verified-build claims?
+  \item What is the right IPC transport for the Resonant Core?
+        Loopback HTTP, Unix socket, or named pipe?
+\end{enumerate}
+
+\section{Reading list}
+
+\begin{itemize}
+  \item Ma et al., ``The Era of 1-bit LLMs: All Large Language
+        Models are in 1.58 Bits'' (arXiv 2402.17764).
+  \item Microsoft, ``BitNet b1.58 2B4T Technical Report''
+        (arXiv 2504.12285).
+  \item Wang et al., ``BitNet b1.58 Reloaded: State-of-the-art
+        Performance Also on Smaller Networks'' (arXiv 2407.09527).
+  \item Ma et al., ``T-SAR: A Full-Stack Co-design for CPU-Only
+        Ternary LLM Inference'' (arXiv 2511.13676).
+  \item ``TerEffic: Highly Efficient Ternary LLM Inference on
+        FPGA'' (arXiv 2502.16473).
+  \item The ResonantOS \texttt{docs/STATUS.md} and
+        \texttt{CHANGELOG.md} as the historical reference.
+\end{itemize}
+
+\section{Methodology}
+
+The lab's research methodology is intentionally boring:
+
+\begin{enumerate}
+  \item Formulate a falsifiable hypothesis.
+  \item Pick a measurement script before writing code.
+  \item Run the measurement three times on three different machines.
+  \item Record the result in this chapter, regardless of outcome.
+  \item If the result contradicts the hypothesis, prefer the
+        evidence and amend the plan.
+\end{enumerate}
+
+\section{Reproduction}
+
+Every measurement cited in this chapter must be reproducible from a
+fresh checkout by running a single command. The command is
+recorded next to the measurement.
+
+\begin{lstlisting}[language=rccossh,caption={Reproduction stub.}]
+# Replace with the actual command when the experiment is run.
+make -C experiments/<topic> measure
+\end{lstlisting}

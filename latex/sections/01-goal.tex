@@ -1,0 +1,81 @@
+% !TEX root = main.tex
+% Section 01: Goal.
+
+\chapter{Goal}
+
+\section{Statement of intent}
+
+The Resonant Cognitive Core Operating System (\RCCOS{}) is an
+experimental, local-first AI operating substrate that evolves the
+architecture of \href{https://github.com/ResonantOS/2.0.0-alpha}{ResonantOS/2.0.0-alpha}
+toward a hardware-adaptive cognitive operating system. The lab's
+central hypothesis is the following.
+
+\begin{quote}
+A lightweight, always-local cognitive model can provide sufficient
+intent recognition, routing, memory retrieval, tool selection, and
+basic planning to serve as the cognitive control plane of an AI
+operating environment across low-resource hardware. Larger local and
+remote models dynamically \emph{extend} --- never define --- the
+intelligence of the system.
+\end{quote}
+
+\section{Scope}
+
+In scope:
+\begin{itemize}
+  \item A deterministic Resonant Core in Rust, addressable by multiple
+        clients (browser extension, desktop shell, CLI, future UIs).
+  \item A Cognitive Core backed by a small, always-on local model.
+        The initial implementation uses a ternary/1.58-bit SLM
+        (Microsoft BitNet b1.58 family or successor).
+  \item A Model Fabric that treats every model (local tiny, local
+        large, cloud frontier, corporate private) as a provider with
+        measured properties: latency, cost, privacy, capability,
+        memory footprint, availability.
+  \item A Living Archive that remains governed: AI cannot unilaterally
+        rewrite trusted memory.
+  \item A capability and security boundary with no AI in the privilege
+        path.
+\end{itemize}
+
+Out of scope:
+\begin{itemize}
+  \item Shipping a ResonantOS distribution.
+  \item Wholesale replacement of the upstream Node bridge on day one
+        (the bridge remains a transitional reference).
+  \item Restoring the deleted Tauri/Electron/native-CEF code unchanged.
+  \item Training a new ResonantOS-specific foundation model in the
+        first five stages.
+  \item Mobile or edge device packaging beyond browser-first.
+\end{itemize}
+
+\section{Non-goals}
+
+\begin{itemize}
+  \item \RCCOS{} is not an LLM client. It is an operating substrate
+        that has local intelligence built in.
+  \item \RCCOS{} is not a chat product. The Cognitive Core is
+        structured-output-first; prose is a fallback, not the
+        default.
+  \item \RCCOS{} is not a "do anything" agent. The deterministic Core
+        decides every privileged action.
+\end{itemize}
+
+\section{Success criteria}
+
+The lab is considered successful if, by the end of Stage 5, all of
+the following hold:
+\begin{enumerate}
+  \item The Resonant Core can be addressed by at least one
+        non-browser client.
+  \item The Cognitive Core runs locally on a CPU-only 8\,GB machine
+        with bounded latency and bounded memory.
+  \item The Capability Engine refuses, in tests, at least one
+        prompt-induced escalation that a free-form language model
+        would have accepted.
+  \item The Living Archive retains provenance for every promoted
+        entry.
+  \item A published benchmark compares cloud-only, conventional
+        local, and ternary local routing for the same task suite.
+\end{enumerate}

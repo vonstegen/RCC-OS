@@ -1,0 +1,148 @@
+% !TEX root = main.tex
+% Section 02: Milestones.
+% Source of truth: docs/MILESTONES.md.
+
+\chapter{Milestones}
+
+\section{Stage taxonomy}
+
+The lab is organized into six stages. Each stage ends with a
+measurable result. The next stage begins only after the previous
+stage's result is recorded.
+
+\begin{longtable}{p{1.0cm}p{3.2cm}p{9.0cm}}
+\toprule
+\textbf{Stage} & \textbf{Title} & \textbf{Goal} \\
+\midrule
+0 & Lab scaffold & Fork, document, snapshot, governance, CI. \\
+1 & Local inference & Tiny SLM behind the existing Node bridge. \\
+2 & Cognitive router & Tiny model is the first-stage router. \\
+3 & Core/client separation & Bridge becomes \texttt{src/core}. \\
+4 & Desktop shell & Tauri-style client around the new Core. \\
+5 & Hardware profiler & Adaptive model selection. \\
+\bottomrule
+\end{longtable}
+
+\section{Stage 0 --- Lab scaffold}
+
+Goal: establish a clean derivative repository of
+ResonantOS/2.0.0-alpha with the vision, architecture, governance,
+and CI baseline.
+
+Deliverables (in this order):
+\begin{itemize}
+  \item \texttt{README.md}, \texttt{docs/VISION.md},
+        \texttt{docs/ARCHITECTURE.md}, \texttt{docs/MILESTONES.md},
+        \texttt{docs/WORKFLOW.md}.
+  \item Snapshot of upstream \texttt{dev} in \texttt{baseline/}.
+  \item \texttt{.gitignore}, \texttt{LICENSE}, \texttt{CONTRIBUTING.md},
+        \texttt{CODE\_OF\_CONDUCT.md}, \texttt{SECURITY.md}.
+  \item Lab-flavored Gitflow with \texttt{main} and \texttt{develop}.
+  \item Initial decisions recorded in \texttt{docs/decisions/}.
+  \item LaTeX documentation layer (this document).
+  \item CI workflows: \texttt{pr-checks}, \texttt{upstream-deterministic},
+        \texttt{gitflow}, \texttt{latex-build}.
+\end{itemize}
+
+\section{Stage 1 --- Local inference}
+
+Goal: prove that a tiny SLM can run on the existing Node bridge
+without destabilizing the upstream ResonantOS runtime.
+
+Deliverables:
+\begin{itemize}
+  \item A local-model service backed by a defensible runtime
+        (initially \texttt{bitnet.cpp} or a Rust-native equivalent).
+  \item A capability-scoped bridge route exposing it.
+  \item Throughput, RAM, and CPU measurements on a reference machine.
+  \item A documentation note describing the integration points with
+        the upstream Node bridge.
+\end{itemize}
+
+Decision gate: continue to Stage 2 only if the local model can run
+reliably below 4\,GB RAM on a CPU-only machine and produces structured
+output that the bridge can validate.
+
+\section{Stage 2 --- Cognitive router}
+
+Goal: make the tiny local model the first-stage intent/router
+before any cloud call.
+
+Deliverables:
+\begin{itemize}
+  \item A new bridge route that accepts user intent, runs the local
+        model, returns a typed capability request.
+  \item A deterministic Core that validates the request and either
+        executes locally, escalates, or returns a missing-capability
+        error.
+  \item A benchmark comparing routing accuracy and cloud-call
+        reduction against the current ResonantOS provider-routing
+        path.
+\end{itemize}
+
+Decision gate: continue to Stage 3 only if the local router achieves
+the routing-accuracy threshold (set before the stage begins) and
+demonstrably reduces cloud calls for common tasks.
+
+\section{Stage 3 --- Core/client separation}
+
+Goal: make the Core addressable by clients other than Chrome.
+
+Deliverables:
+\begin{itemize}
+  \item A new \texttt{src/core} module that exposes the same
+        capability surface as the current Node bridge.
+  \item The Chrome extension becomes a thin client talking to the
+        Core through the existing authenticated bridge protocol.
+  \item A minimal CLI client that issues a single capability
+        request end-to-end.
+\end{itemize}
+
+Decision gate: continue to Stage 4 only if the CLI client can
+perform at least one meaningful task (e.g.\ read a file, summarize
+it, write a result) without the Chrome extension loaded.
+
+\section{Stage 4 --- Desktop shell}
+
+Goal: bring back a native desktop client around the new Core.
+
+Deliverables:
+\begin{itemize}
+  \item A Tauri-style shell that loads a web UI and talks to the
+        Core.
+  \item macOS \texttt{.app} and \texttt{.dmg} builds.
+  \item Windows \texttt{.msi} and \texttt{.exe} builds.
+  \item Linux package builds.
+\end{itemize}
+
+Decision gate: continue to Stage 5 only if both macOS and Windows
+installers build successfully on the reference CI and pass a
+one-click smoke test.
+
+\section{Stage 5 --- Hardware profiler}
+
+Goal: detect the host hardware and choose the model tier adaptively.
+
+Deliverables:
+\begin{itemize}
+  \item A hardware-profiler service that reports architecture, CPU,
+        RAM, GPU/NPU, disk, and OS.
+  \item A model-tier selector that maps the profile to a recommended
+        Cognitive Core model and provider set.
+  \item End-to-end benchmarks across at least three reference
+        machines: low-RAM, mid-range, accelerated.
+\end{itemize}
+
+\section{Working assumptions}
+
+\begin{itemize}
+  \item The local SLM is honest about uncertainty. It returns
+        structured fields, not free-form prose, for routing
+        decisions.
+  \item The deterministic Core never blocks on the local model for
+        more than a bounded budget. If the model times out, the Core
+        falls back to a safe default.
+  \item Capability policy is written before the model is integrated,
+        not after.
+  \item All measurements are reproducible from a fresh checkout.
+\end{itemize}

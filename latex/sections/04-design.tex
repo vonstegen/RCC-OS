@@ -1,0 +1,150 @@
+% !TEX root = main.tex
+% Section 04: Design.
+% This chapter contains the lab's interface designs.
+
+\chapter{Design}
+
+\section{Status}
+
+Designs in this chapter are working documents. Each design becomes
+binding only when promoted to an ADR and signed off in
+\texttt{docs/decisions/}.
+
+\section{Resonant Core IPC contract}
+
+The Core exposes a single authenticated transport on loopback
+(Unix socket on Linux/macOS, named pipe on Windows). The transport
+is language-agnostic; clients speak it from any language that can
+serialize JSON or CBOR.
+
+\subsection{Message envelope}
+
+\begin{lstlisting}[language=rccosjson,caption={Request envelope.}]
+{
+  "id": "<uuidv7>",
+  "ts": "<rfc3339>",
+  "type": "request",
+  "method": "capability.execute",
+  "auth": {
+    "client_id": "<client id>",
+    "signature": "<ed25519 over the rest of the message>"
+  },
+  "body": { ... }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=rccosjson,caption={Response envelope.}]
+{
+  "id": "<matches request id>",
+  "ts": "<rfc3339>",
+  "type": "response",
+  "ok": true,
+  "body": { ... }
+}
+\end{lstlisting}
+
+The signature is verified by the Core against a per-client
+public key. Clients receive a key on first pairing; the private
+key never leaves the client process.
+
+\subsection{Capability request}
+
+\begin{lstlisting}[language=rccosjson,caption={Capability execute body.}]
+{
+  "capability": "filesystem.read",
+  "args": { "path": "/Users/you/Documents/report.pdf" },
+  "rationale": "user requested: read the report",
+  "context_refs": ["memory:budget-2026"]
+}
+\end{lstlisting}
+
+The Core validates:
+\begin{enumerate}
+  \item the client is authorized for the capability;
+  \item the args match the capability's typed schema;
+  \item the rationale field is non-empty and free of the
+        human-only verbs (wallet, sign, payment, publish,
+        credential);
+  \item the requested path is inside an allow-listed root.
+\end{enumerate}
+
+If any check fails, the request is rejected and audited. The AI is
+not asked to defend or retry.
+
+\section{Cognitive Core interface}
+
+The Cognitive Core is invoked with a structured request and returns
+a structured response. Free-form prose is permitted only as a final
+explanation field, never as the primary decision.
+
+\begin{lstlisting}[language=rccosjson,caption={Cognitive Core request.}]
+{
+  "task": "route",
+  "input": "Open the budget spreadsheet and summarize it",
+  "available_capabilities": ["filesystem.read", "spreadsheet.inspect"],
+  "available_models": ["core-local", "local-7b", "cloud-gpt"],
+  "context_summary": "..."
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=rccosjson,caption={Cognitive Core response.}]
+{
+  "intent": "summarize_document",
+  "capabilities": ["filesystem.read", "spreadsheet.inspect"],
+  "model_tier": "local",
+  "memory_queries": ["budget-2026", "spreadsheet:budget"],
+  "explanation": "User asked for a summary; the local model can read the file and call the spreadsheet inspect tool."
+}
+\end{lstlisting}
+
+The Core wraps this in an internal capability request before
+executing anything.
+
+\section{Hardware profile}
+
+The hardware profile is a JSON object:
+
+\begin{lstlisting}[language=rccosjson,caption={Hardware profile.}]
+{
+  "arch": "aarch64",
+  "os": "macos",
+  "os_version": "15.4",
+  "cpu": { "model": "Apple M3", "cores": 8, "features": ["neon"] },
+  "ram_mb": 16384,
+  "disk_mb": 512000,
+  "accelerators": [{ "kind": "metal", "model": "Apple M3 GPU" }]
+}
+\end{lstlisting}
+
+The model-tier selector is a deterministic function of this object
+plus the Cognitive Core's measured properties:
+
+\begin{lstlisting}[language=rccossh,caption={Model tier selector (pseudocode).}]
+def select_tier(profile, core_stats):
+    if profile.ram_mb < 4096:
+        return "ternary-only"
+    if profile.ram_mb < 8192:
+        return "ternary+small-local"
+    if profile.accelerators:
+        return "ternary+accelerated-local"
+    return "ternary+full-local"
+\end{lstlisting}
+
+\section{Capability taxonomy}
+
+Capabilities are namespaced and typed. The first-class namespaces
+are:
+
+\begin{itemize}
+  \item \texttt{filesystem.*} --- read, write, list, stat.
+  \item \texttt{process.*} --- spawn, kill, signal.
+  \item \texttt{network.*} --- connect, listen (loopback only by default).
+  \item \texttt{browser.*} --- tab, navigation, content (when the
+        browser client is present).
+  \item \texttt{memory.*} --- query, store, promote.
+  \item \texttt{cognition.*} --- route, plan, summarize.
+  \item \texttt{device.*} --- notifications, clipboard, audio.
+\end{itemize}
+
+Each capability has a JSON schema for its arguments. The Core
+rejects requests that do not match the schema.

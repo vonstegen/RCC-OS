@@ -3,17 +3,17 @@ name: pr-checks
 # Lightweight PR-time checks for the lab itself (not the upstream
 # baseline). Catches the things reviewers should not have to
 # hand-check on every PR: trailing whitespace, large generated
-# artifacts, accidental writes into baseline/, and missing ADR
-# links from staged work. Action refs are pinned to 40-char SHAs.
+# artifacts, accidental writes into baseline/, missing required
+# docs, action-pin policy. Action refs are pinned to 40-char SHAs.
 
 permissions:
   contents: read
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 jobs:
@@ -55,8 +55,24 @@ jobs:
 
       - name: Trailing-whitespace check
         run: |
-          if git diff --check "${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"..HEAD; then
-            echo "::error::Trailing whitespace detected."
+          base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
+          # Show every file touched in the range and grep for trailing
+          # spaces. git diff --check 2.54 changed behavior in subtle
+          # ways; this explicit grep is deterministic and reports
+          # which file and line is offending.
+          files=$(git diff --name-only --diff-filter=ACMRT "$base"..HEAD)
+          bad=""
+          for f in $files; do
+            if [ -f "$f" ]; then
+              ws=$(grep -nE ' +$' "$f" || true)
+              if [ -n "$ws" ]; then
+                bad="$bad\n$f:\n$ws\n"
+              fi
+            fi
+          done
+          if [ -n "$bad" ]; then
+            echo "::error::Trailing whitespace detected:"
+            printf '%b' "$bad"
             exit 1
           fi
 
@@ -66,7 +82,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Verify all uses: references are 40-char SHAs
+      - name: 'Verify uses: references are 40-char SHAs'
         run: |
           bad=$(grep -RhoE "uses:[[:space:]]+[A-Za-z0-9_.-]+@[0-9a-f]{1,39}([^0-9a-f]|$)" .github/workflows || true)
           if [ -n "$bad" ]; then
@@ -84,7 +100,24 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Verify required docs exist
         run: |
-          for f in README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md SUPPORT.md docs/VISION.md docs/ARCHITECTURE.md docs/MILESTONES.md; do
+          for f in README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md SUPPORT.md \
+                   docs/VISION.md docs/ARCHITECTURE.md docs/MILESTONES.md docs/WORKFLOW.md \
+                   docs/decisions/README.md; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Missing or empty required file: $f"
+              exit 1
+            fi
+          done
+
+  latex-presence:
+    name: LaTeX scaffold presence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify LaTeX scaffold is present
+        run: |
+          for f in latex/README.md latex/Makefile latex/latexmkrc latex/main.tex; do
             if [ ! -s "$f" ]; then
               echo "::error::Missing or empty required file: $f"
               exit 1
