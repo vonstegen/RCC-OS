@@ -6,7 +6,7 @@ alternatives considered, and the consequences.
 
 | Number | Title | Status |
 | --- | --- | --- |
-| (none yet) | — | — |
+| [0001](0001-resonant-core-in-rust.md) | Resonant Core is implemented in Rust | Proposed |
 
 ## Process
 

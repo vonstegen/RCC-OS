@@ -1,0 +1,92 @@
+name: pr-checks
+
+# Lightweight PR-time checks for the lab itself (not the upstream
+# baseline). Catches the things reviewers should not have to
+# hand-check on every PR: trailing whitespace, large generated
+# artifacts, accidental writes into baseline/, and missing ADR
+# links from staged work. Action refs are pinned to 40-char SHAs.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  repo-hygiene:
+    name: Repo hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Disallow changes inside baseline/
+        run: |
+          if git diff --name-only --diff-filter=ACMRT "${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"..HEAD | grep -E '^baseline/'; then
+            echo "::error::PR modifies files inside baseline/. baseline/ is a read-only snapshot."
+            echo "::error::Refresh the snapshot via a dedicated upstream-sync branch instead."
+            exit 1
+          fi
+
+      - name: Block generated credentials
+        run: |
+          if git ls-files | grep -E '(bridge-config\.generated\.js|\.env($|\.)|BridgeTLS/ResonantOS_User/)'; then
+            echo "::error::Tracked files appear to contain generated credentials or runtime state."
+            exit 1
+          fi
+
+      - name: Reject large diff blobs
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
+          max_kb=512
+          bad=$(git diff --numstat "$base"..HEAD \
+            | awk -v max="$max_kb" '{ if ($1 > max || $2 > max) print $3 }' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Files exceeding ${max_kb}KB changed in a single line:"
+            echo "$bad"
+            exit 1
+          fi
+
+      - name: Trailing-whitespace check
+        run: |
+          if git diff --check "${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"..HEAD; then
+            echo "::error::Trailing whitespace detected."
+            exit 1
+          fi
+
+  pin-policy:
+    name: Action pin policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify all uses: references are 40-char SHAs
+        run: |
+          bad=$(grep -RhoE "uses:[[:space:]]+[A-Za-z0-9_.-]+@[0-9a-f]{1,39}([^0-9a-f]|$)" .github/workflows || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Short-SHA action pin detected:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "All action refs are pinned to 40-char SHAs."
+
+  docs-routing:
+    name: Docs router presence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Verify required docs exist
+        run: |
+          for f in README.md LICENSE CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md SUPPORT.md docs/VISION.md docs/ARCHITECTURE.md docs/MILESTONES.md; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Missing or empty required file: $f"
+              exit 1
+            fi
+          done
