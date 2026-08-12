@@ -44,7 +44,9 @@ jobs:
             texlive-bibtex-extra \
             biber \
             latexmk \
-            make
+            make \
+            poppler-utils \
+            lmodern
 
       - name: Build
         working-directory: latex
