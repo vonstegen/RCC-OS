@@ -6,7 +6,11 @@ name: upstream-deterministic
 #
 # This workflow is strict on tests. Dependency-advisory status is
 # reported separately by upstream-advisories and is not gating here.
-# Additive to (not a replacement for) the upstream workflow.
+# Upstream's docs:check is not appropriate for the lab (it asserts
+# the lab's docs tree matches upstream's, which it does not by
+# design) and is excluded. The upstream verify:alpha argv regression
+# (C2 from the chat review: `npm test -- --run`) is corrected to
+# `npm test`. Live cert suites that require Chrome are excluded.
 # Action refs are pinned to 40-char commit SHAs.
 
 permissions:
@@ -49,15 +53,31 @@ jobs:
         working-directory: baseline
         run: npm ci --prefix addons/resonant-browser-host
 
-      - name: Verify Alpha (deterministic suite)
+      - name: Verify Alpha (deterministic suite, lab-adjusted)
+        # Run every gate that applies in the lab context, in a stable
+        # order. We intentionally omit:
+        #   - docs:check / test:docs: asserts the lab's docs tree
+        #     matches upstream's canonical reading order.
+        #   - test:browser-first:live: requires a real Chrome + xvfb.
+        #   - npm test -- --run: the upstream argv regression noted
+        #     in the chat review (C2). We use `npm test` instead.
         working-directory: baseline
         env:
           RESONANTOS_BROWSER_HOST_CHANNEL: chrome
-        run: npm run verify:alpha
-
-      - name: Run pre-release artifact scan
-        working-directory: baseline
-        run: npm run pre-release:scan
+        run: |
+          set -e
+          npm run repo:hygiene
+          npm test
+          npm run test:living-archive-mcp
+          npm run test:living-archive-memory-service
+          npm run test:browser-host
+          npm run test:browser-first
+          npm run test:health
+          npm run test:engineer-runner
+          npm run test:security-pipeline
+          npm run test:module-ownership
+          npm run discipline:validate
+          npm run pre-release:scan
 
       - name: Summarize result
         if: always()
