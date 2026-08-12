@@ -119,7 +119,7 @@ The hardware profile is a JSON object:
 The model-tier selector is a deterministic function of this object
 plus the Cognitive Core's measured properties:
 
-\begin{lstlisting}[language=rccossh,caption={Model tier selector (pseudocode).]
+\begin{lstlisting}[language=rccossh,caption={Model tier selector (pseudocode).}]
 def select_tier(profile, core_stats):
     if profile.ram_mb < 4096:
         return "ternary-only"
