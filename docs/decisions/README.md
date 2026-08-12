@@ -7,6 +7,7 @@ alternatives considered, and the consequences.
 | Number | Title | Status |
 | --- | --- | --- |
 | [0002](0002-self-review-on-main.md) | Main-branch self-review is permitted for lab release cuts | Accepted |
+| [0004](0004-upstream-suite-parity.md) | Upstream-suite parity policy for the lab | Proposed |
 
 ## Process
 

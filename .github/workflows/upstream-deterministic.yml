@@ -6,11 +6,13 @@ name: upstream-deterministic
 #
 # This workflow is strict on tests. Dependency-advisory status is
 # reported separately by upstream-advisories and is not gating here.
-# Upstream's docs:check is not appropriate for the lab (it asserts
-# the lab's docs tree matches upstream's, which it does not by
-# design) and is excluded. The upstream verify:alpha argv regression
-# (C2 from the chat review: `npm test -- --run`) is corrected to
-# `npm test`. Live cert suites that require Chrome are excluded.
+#
+# The gate list is the lab-adjusted subset of upstream verify:alpha.
+# Why each dropped or replaced gate is excluded, and the re-enable
+# conditions, are recorded in
+# docs/decisions/0004-upstream-suite-parity.md (ADR-0004). If you
+# add or remove a gate, update ADR-0004 in the same PR.
+#
 # Action refs are pinned to 40-char commit SHAs.
 
 permissions:
