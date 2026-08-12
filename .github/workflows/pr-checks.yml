@@ -36,8 +36,34 @@ jobs:
 
       - name: Block generated credentials
         run: |
-          if git ls-files | grep -E '(bridge-config\.generated\.js|\.env($|\.)|BridgeTLS/ResonantOS_User/)'; then
-            echo "::error::Tracked files appear to contain generated credentials or runtime state."
+          # Check 1: tracked file names. Catches `git add -f <name>`
+          # where the contributor forced an ignored file into the index.
+          if git ls-files | grep -E '(^|/)bridge-config\.generated\.js$|(^|/)\.env($|\.)|BridgeTLS/ResonantOS_User/'; then
+            echo "::error::Tracked file appears to be a generated credential or runtime state artifact."
+            echo "::error::These names are .gitignore-excluded by design; do not force-add them."
+            exit 1
+          fi
+          # Check 2: working-tree presence. Catches the case where a
+          # generated file is in the working tree but never staged
+          # (would be a local leak risk; surfaces as a hygiene
+          # violation on PRs from contributors who run `git status`
+          # before pushing).
+          if git ls-files --others --exclude-standard 2>/dev/null | grep -E '(^|/)bridge-config\.generated\.js$|(^|/)\.env($|\.)|BridgeTLS/ResonantOS_User/' >/dev/null; then
+            echo "::error::Generated credential or runtime state artifact present in working tree but not staged."
+            echo "::error::Delete the local file; it is in .gitignore on purpose."
+            exit 1
+          # Check 3: high-entropy strings in the diff. Catches novel
+          # credential shapes that the name-based checks miss. Only
+          # runs on lab-authored files (outside baseline/) so that
+          # upstream test fixtures like 'sk-EXAMPLEEXAMPLEEXAMPLE'
+          # do not false-positive.
+          base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
+          hits=$(git diff "$base"..HEAD --diff-filter=ACMRT -- . ':!baseline' 2>/dev/null \
+            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Possible high-entropy credential shape detected in the diff:"
+            echo "$hits"
+            echo "::error::If this is a test fixture, use a clearly fake value like 'sk-EXAMPLEEXAMPLEEXAMPLE'."
             exit 1
           fi
 
