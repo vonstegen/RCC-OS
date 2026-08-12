@@ -117,7 +117,7 @@ test("proxy: serves /hermes-dashboard/ from the upstream root", async () => {
   });
 });
 
-test("proxy: allows iframe src dashboard mirror paths on loopback by default", async () => {
+test("proxy: allows /hermes-dashboard on loopback without the bridge token; other mirror paths require it (ADR-0005)", async () => {
   await withFakeUpstream((req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ path: req.url }));
@@ -125,13 +125,21 @@ test("proxy: allows iframe src dashboard mirror paths on loopback by default", a
     await withBridgeServer(
       { bridgeToken: "proxy-test-token", routes: [] },
       async ({ bridgeUrl }) => {
+        // Only /hermes-dashboard is open on loopback.
         const root = await fetch(`${bridgeUrl}/hermes-dashboard/`);
         assert.equal(root.status, 200);
         assert.equal((await root.json()).path, "/");
 
-        const asset = await fetch(`${bridgeUrl}/assets/index-abc.js`);
-        assert.equal(asset.status, 200);
-        assert.equal((await asset.json()).path, "/assets/index-abc.js");
+        // /assets now requires the token (ADR-0005: only the
+        // iframe src target is open; the rest are reachable from
+        // extension code that sets the bridge-token header).
+        const assetNoToken = await fetch(`${bridgeUrl}/assets/index-abc.js`);
+        assert.equal(assetNoToken.status, 401);
+        const assetWithToken = await fetch(`${bridgeUrl}/assets/index-abc.js`, {
+          headers: { "X-ResonantOS-Bridge-Token": "proxy-test-token" },
+        });
+        assert.equal(assetWithToken.status, 200);
+        assert.equal((await assetWithToken.json()).path, "/assets/index-abc.js");
       },
     );
   });

@@ -16,7 +16,12 @@ const bridgeCapabilityBootstrapHeaderName = "X-ResonantOS-Capability-Bootstrap-T
 // (read by startBridgeServer / writeBridgeConfig)
 //
 // RESONANTOS_BRIDGE_HOST   - bind address (default 127.0.0.1; use 0.0.0.0 to
-//                            expose to LAN/Tailscale, or a specific IP)
+//                            expose to LAN/Tailscale, or a specific IP).
+//                            Non-loopback binds require
+//                            RESONANTOS_BRIDGE_ALLOWED_IPS to be set;
+//                            see ADR-0005. The override
+//                            RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1
+//                            disables the refuse-to-start guard.
 // RESONANTOS_BRIDGE_PUBLIC_URL - URL written into the generated bridge config
 //                            (default: "http://${RESONANTOS_BRIDGE_HOST}:port")
 // RESONANTOS_BRIDGE_ALLOWED_ORIGINS - comma-separated list of allowed
@@ -25,7 +30,8 @@ const bridgeCapabilityBootstrapHeaderName = "X-ResonantOS-Capability-Bootstrap-T
 //                            (extensionOrigin passed at startup only).
 // RESONANTOS_BRIDGE_ALLOWED_IPS - comma-separated list of allowed client IPs
 //                            (e.g. "192.168.0.0/16,100.100.0.0/16"). Default:
-//                            empty (no IP gating).
+//                            empty (no IP gating). Required for non-loopback
+//                            binds.
 // RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES - comma-separated list of URL
 //                            path prefixes (e.g. "/hermes-dashboard")
 //                            that do NOT require the bridge token to
@@ -33,10 +39,13 @@ const bridgeCapabilityBootstrapHeaderName = "X-ResonantOS-Capability-Bootstrap-T
 //                            an <iframe src> — browsers can't set
 //                            custom headers on iframe requests, so the
 //                            SPA's first paint would 401 without this.
-//                            Auth is still enforced via the IP allowlist
-//                            (RESONANTOS_BRIDGE_ALLOWED_IPS) so only
-//                            LAN/Tailscale clients can hit these paths.
-
+//                            The default on loopback is "/hermes-dashboard"
+//                            (the only path that actually needs to be
+//                            an <iframe src>). On non-loopback binds the
+//                            default is empty (every path requires the
+//                            token). Auth is still enforced via the IP
+//                            allowlist (RESONANTOS_BRIDGE_ALLOWED_IPS) so
+//                            only LAN/Tailscale clients can hit open paths.
 function parseAllowedList(value) {
   if (!value) return [];
   return String(value)
@@ -954,17 +963,26 @@ export function getBridgeAllowedOrigins() {
 export function getBridgeAllowedCidrs() {
   return parseAllowedList(process.env.RESONANTOS_BRIDGE_ALLOWED_IPS);
 }
-
 function isLoopbackBridgeHost(host) {
   const value = String(host ?? "").trim().toLowerCase();
   return value === "localhost" || value === "127.0.0.1" || value === "::1" || value === "[::1]";
 }
 
+// Default open-path prefix on loopback. Only the iframe src target
+// (/hermes-dashboard) is exempted by default; the other mirror
+// paths are reachable from extension code that sets the bridge
+// token. See ADR-0005.
+const LOOPBACK_DEFAULT_OPEN_PREFIX = "/hermes-dashboard";
+
 export function getBridgeOpenProxyPrefixes({ host = getBridgeHost(), allowedCidrs = getBridgeAllowedCidrs() } = {}) {
   const configured = parseAllowedList(process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES);
   if (configured.length > 0) return configured;
-  if (isLoopbackBridgeHost(host) || allowedCidrs.length > 0) {
-    return DASHBOARD_PROXY_MIRROR_PATHS.map((entry) => entry.bridge);
+  // Loopback: only the iframe target is exempt. Non-loopback: no
+  // defaults; operators who want exemptions must set the env var
+  // explicitly (and the IP allowlist must be non-empty — see
+  // startBridgeServer's refuse-to-start guard).
+  if (isLoopbackBridgeHost(host)) {
+    return [LOOPBACK_DEFAULT_OPEN_PREFIX];
   }
   return [];
 }
@@ -1184,6 +1202,28 @@ export async function startBridgeServer({
   openPathPrefixes,
 }) {
   const bindHost = host ?? getBridgeHost();
+  // ADR-0005: refuse to start when bound to non-loopback without
+  // an explicit IP allowlist. Override via
+  // RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1 for the lab's
+  // smoke tests; the override is logged at warn level.
+  if (!isLoopbackBridgeHost(bindHost) && allowedCidrs.length === 0) {
+    const override = String(process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS ?? "").trim() === "1";
+    if (!override) {
+      const error = new Error(
+        `[bridge] refuse to start: bind host ${bindHost} is non-loopback but RESONANTOS_BRIDGE_ALLOWED_IPS is not set. ` +
+          `Refusing to expose the bridge to the LAN without an explicit IP allowlist. ` +
+          `Set RESONANTOS_BRIDGE_ALLOWED_IPS to a comma-separated CIDR list, or set ` +
+          `RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1 to override (not recommended).`,
+      );
+      error.code = "BRIDGE_REFUSE_LAN_NO_CIDRS";
+      throw error;
+    }
+    console.warn(
+      `[bridge] WARNING: bound to non-loopback host ${bindHost} with no IP allowlist. ` +
+        `RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1 override is in effect. Every route is ` +
+        `reachable from any network the host is on.`,
+    );
+  }
   const effectiveOpenPathPrefixes = openPathPrefixes ?? getBridgeOpenProxyPrefixes({ host: bindHost, allowedCidrs });
   const effectiveProxyHandler =
     dashboardProxyHandler ??
@@ -1237,6 +1277,17 @@ export async function startBridgeServer({
     };
     const onListening = () => {
       server.off("error", onError);
+      // ADR-0005: emit a startup banner so the operator can see
+      // the bind host, the IP-allowlist status, and the active
+      // open-path exemptions on every start.
+      const address = server.address();
+      const actualHost = typeof address === "object" && address ? address.address : bindHost;
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      const allowlistStatus = allowedCidrs.length === 0 ? "off" : `${allowedCidrs.length}cidrs`;
+      console.log(
+        `[bridge] bound to ${actualHost}:${actualPort}; token=${bridgeToken ? "on" : "off"}; ` +
+          `ip-allowlist=${allowlistStatus}; open-prefixes=[${effectiveOpenPathPrefixes.join(",")}]`,
+      );
       resolve();
     };
     server.once("error", onError);

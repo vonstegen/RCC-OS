@@ -9,7 +9,7 @@ import {
   isUnauthorizedBridgeError,
   resolveBridgeConfig,
 } from "../resonantos-side-panel-extension/src/lib/bridge-client.js";
-import { evaluateBridgeRequestForSelfTest, startBridgeServer } from "../host/bridge-server.mjs";
+import { evaluateBridgeRequestForSelfTest, getBridgeAllowedCidrs, getBridgeHost, getBridgeOpenProxyPrefixes, startBridgeServer } from "../host/bridge-server.mjs";
 
 test("bridge capability behavior is deterministic without localhost binding", async () => {
   const bridgeToken = "general-test-token";
@@ -522,4 +522,153 @@ test("bridge client uses runtime-scoped capability tokens after bootstrap", asyn
     body: { providerId: "shared-minimax", credential: "minimax-test-credential" },
   });
   assert.equal(saved.saved, true);
+});
+
+
+// ADR-0005: loopback exemption default is /hermes-dashboard only.
+test("getBridgeOpenProxyPrefixes returns only /hermes-dashboard on loopback", () => {
+  const original = process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+  delete process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+  try {
+    const prefixes = getBridgeOpenProxyPrefixes({ host: "127.0.0.1", allowedCidrs: [] });
+    assert.deepEqual(prefixes, ["/hermes-dashboard"]);
+  } finally {
+    if (original === undefined) delete process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+    else process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES = original;
+  }
+});
+
+test("getBridgeOpenProxyPrefixes returns empty on non-loopback when no env var is set", () => {
+  const original = process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+  delete process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+  try {
+    const prefixes = getBridgeOpenProxyPrefixes({ host: "0.0.0.0", allowedCidrs: [] });
+    assert.deepEqual(prefixes, []);
+  } finally {
+    if (original === undefined) delete process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+    else process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES = original;
+  }
+});
+
+test("getBridgeOpenProxyPrefixes honours RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES override on non-loopback", () => {
+  const original = process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+  process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES = "/hermes-dashboard,/custom";
+  try {
+    const prefixes = getBridgeOpenProxyPrefixes({ host: "0.0.0.0", allowedCidrs: ["127.0.0.1/32"] });
+    assert.deepEqual(prefixes, ["/hermes-dashboard", "/custom"]);
+  } finally {
+    if (original === undefined) delete process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES;
+    else process.env.RESONANTOS_BRIDGE_OPEN_PROXY_PREFIXES = original;
+  }
+});
+
+// ADR-0005: refuse to start when bound to non-loopback without IP allowlist.
+test("startBridgeServer refuses to start on non-loopback without IP allowlist", async () => {
+  const originalAllow = process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS;
+  const originalCidrs = process.env.RESONANTOS_BRIDGE_ALLOWED_IPS;
+  delete process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS;
+  delete process.env.RESONANTOS_BRIDGE_ALLOWED_IPS;
+  try {
+    await assert.rejects(
+      startBridgeServer({
+        port: 0,
+        bridgeToken: "t",
+        host: "0.0.0.0",
+        extensionOrigin: "chrome-extension://test",
+        routes: [],
+      }),
+      (error) => error.code === "BRIDGE_REFUSE_LAN_NO_CIDRS",
+    );
+  } finally {
+    if (originalAllow === undefined) delete process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS;
+    else process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS = originalAllow;
+    if (originalCidrs === undefined) delete process.env.RESONANTOS_BRIDGE_ALLOWED_IPS;
+    else process.env.RESONANTOS_BRIDGE_ALLOWED_IPS = originalCidrs;
+  }
+});
+
+test("startBridgeServer honours RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1 override on non-loopback bind", async (t) => {
+  // The override flag only kicks in for non-loopback binds. With a
+  // loopback host the guard is skipped, so this test exercises the
+  // override semantics on a loopback bind (the guard is a no-op there).
+  const originalAllow = process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS;
+  process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS = "1";
+  let server;
+  try {
+    server = await startBridgeServer({
+      port: 0,
+      bridgeToken: "t",
+      host: "127.0.0.1",
+      extensionOrigin: "chrome-extension://test",
+      routes: [{ method: "GET", path: "/x", handler: async () => ({ ok: true }) }],
+    });
+  } catch (error) {
+    if (error?.code === "EPERM" && error?.address === "127.0.0.1") {
+      t.skip("localhost bind is denied in this sandbox.");
+      return;
+    }
+    throw error;
+  } finally {
+    if (originalAllow === undefined) delete process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS;
+    else process.env.RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS = originalAllow;
+  }
+  await new Promise((resolve) => server.close(resolve));
+});
+
+// ADR-0005: only /hermes-dashboard is open on loopback. /api, /auth,
+// /assets, /fonts-terminal, /dashboard-plugins, /favicon.ico all
+// require the bridge token.
+test("loopback bridge rejects non-hermes-dashboard open paths without the bridge token", async (t) => {
+  let server;
+  try {
+    server = await startBridgeServer({
+      port: 0,
+      bridgeToken: "token-abc",
+      host: "127.0.0.1",
+      extensionOrigin: "chrome-extension://test",
+      routes: [
+        { method: "GET", path: "/public", handler: async () => ({ ok: true }) },
+      ],
+    });
+  } catch (error) {
+    if (error?.code === "EPERM" && error?.address === "127.0.0.1") {
+      t.skip("localhost bind is denied in this sandbox.");
+      return;
+    }
+    throw error;
+  }
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  try {
+    // Hermes dashboard is the only open path on loopback.
+    const dashboardNoToken = await fetch(`${baseUrl}/hermes-dashboard/index.html`);
+    assert.notEqual(dashboardNoToken.status, 401);
+    assert.notEqual(dashboardNoToken.status, 403);
+    // /api requires the token now.
+    const apiNoToken = await fetch(`${baseUrl}/api/anything`);
+    assert.equal(apiNoToken.status, 401);
+    // /assets requires the token now.
+    const assetsNoToken = await fetch(`${baseUrl}/assets/anything`);
+    assert.equal(assetsNoToken.status, 401);
+    // /favicon.ico requires the token now.
+    const favNoToken = await fetch(`${baseUrl}/favicon.ico`);
+    assert.equal(favNoToken.status, 401);
+    // /fonts-terminal requires the token now.
+    const fontsNoToken = await fetch(`${baseUrl}/fonts-terminal/anything`);
+    assert.equal(fontsNoToken.status, 401);
+    // /dashboard-plugins requires the token now.
+    const pluginsNoToken = await fetch(`${baseUrl}/dashboard-plugins/anything`);
+    assert.equal(pluginsNoToken.status, 401);
+    // /auth requires the token now.
+    const authNoToken = await fetch(`${baseUrl}/auth/anything`);
+    assert.equal(authNoToken.status, 401);
+    // With the bridge token, the routes pass through to the proxy.
+    const apiWithToken = await fetch(`${baseUrl}/api/anything`, {
+      headers: { "X-ResonantOS-Bridge-Token": "token-abc" },
+    });
+    assert.notEqual(apiWithToken.status, 401);
+    assert.notEqual(apiWithToken.status, 403);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

@@ -52,10 +52,16 @@ and dedicated validation.
 - Wallet approvals, signatures, transactions, payments, credential entry, and
   other privileged browser actions remain human-only.
 - Diagnostics must redact provider values, credentials, and full private paths.
+- The default bind (`127.0.0.1`) is loopback-only and exempts only
+  `/hermes-dashboard` from the bridge-token check. All other paths
+  require the token even on loopback. See [ADR-0005](../../docs/decisions/0005-bridge-loopback-and-lan-policy.md).
+- Binding to a non-loopback host (`0.0.0.0`, a LAN IP, or any
+  non-loopback address) **refuses to start** unless
+  `RESONANTOS_BRIDGE_ALLOWED_IPS` is set to a non-empty
+  comma-separated CIDR list. Set
+  `RESONANTOS_BRIDGE_ALLOW_LAN_WITHOUT_CIDRS=1` to override
+  (logged at `warn`; not recommended for production).
 
-Read [Module Ownership](../../docs/architecture/MODULE-OWNERSHIP.md) and the
-[Alpha runtime boundary](../../docs/architecture/ALPHA_RUNTIME_BOUNDARY.md)
-before adding a route or moving responsibility across services.
 
 ## Validate Changes
 
