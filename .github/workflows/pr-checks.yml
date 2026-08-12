@@ -174,26 +174,21 @@ jobs:
           fi
       - name: Verify docs/ <-> latex/sections/ source-of-truth parity
         run: |
-          # Every docs/*.md file (excluding index files) must claim at
-          # least one latex/sections/NN-*.tex file as 'Source of
-          # truth' in its comments, AND every latex/sections/*.tex
-          # file that names a docs/*.md as 'Source of truth' must
-          # have that file exist. Bidirectional.
+          # Every docs/*.md in the four-pair list must be named as
+          # 'Source of truth' by at least one latex/sections/*.tex
+          # file. The Markdown file does not need to reference the
+          # LaTeX file by path; the LaTeX side is the authority.
           broken=""
-          # Forward: docs/*.md -> claimed LaTeX section.
           for md in docs/VISION.md docs/MILESTONES.md docs/ARCHITECTURE.md docs/WORKFLOW.md; do
             if [ ! -f "$md" ]; then
               continue
             fi
-            base=$(basename "$md" .md)
-            claimed=$(grep -E 'latex/sections/[0-9]+-[A-Za-z_-]*\.tex' "$md" 2>/dev/null \
-              | grep -oE 'latex/sections/[0-9]+-[A-Za-z_-]*\.tex' || true)
-            if [ -z "$claimed" ]; then
-              broken="$broken\n$md does not name a latex/sections/ counterpart in its content."
+            if ! grep -lqF "Source of truth: $md" latex/sections/*.tex 2>/dev/null; then
+              broken="$broken\n$md is not named as 'Source of truth' by any latex/sections/*.tex file."
             fi
           done
-          # Reverse: latex/sections/*.tex that names a docs/*.md as
-          # Source of truth must reference an existing file.
+          # Reverse: every latex/sections/*.tex that names a docs/*.md
+          # as 'Source of truth' must reference an existing file.
           for tex in latex/sections/*.tex; do
             src=$(echo "$tex" | grep -oE 'docs/[A-Za-z0-9_./-]+\.md' || true)
             if [ -n "$src" ] && [ ! -f "$src" ]; then
