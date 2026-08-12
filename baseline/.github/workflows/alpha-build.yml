@@ -1,0 +1,66 @@
+name: alpha-build
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - dev
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build-alpha:
+    name: Build Chrome extension alpha
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Audit app dependencies
+        run: npm audit --audit-level=high
+
+      - name: Install browser host dependencies
+        run: npm ci --prefix addons/resonant-browser-host
+
+      - name: Audit browser host dependencies
+        run: npm audit --prefix addons/resonant-browser-host --audit-level=high
+
+      - name: Verify Alpha
+        env:
+          RESONANTOS_BROWSER_HOST_CHANNEL: chrome
+          RESONANTOS_SCOPE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || 'origin/dev' }}
+          RESONANTOS_SCOPE_HEAD: ${{ github.sha }}
+        run: npm run verify:alpha
+
+      - name: Package Chrome extension
+        run: |
+          cd browser-first/resonantos-side-panel-extension
+          zip -r ../../resonantos-side-panel-extension.zip . -x "*.DS_Store" "src/bridge-config.generated.js"
+
+      - name: Run pre-release artifact scan
+        run: npm run pre-release:scan
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: resonantos-side-panel-extension
+          path: resonantos-side-panel-extension.zip
+          retention-days: 14
