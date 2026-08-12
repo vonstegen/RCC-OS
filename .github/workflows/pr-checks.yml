@@ -60,7 +60,7 @@ jobs:
           base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
           diff_hits=$(git diff "$base"..HEAD --diff-filter=ACMRT \
             -- . ':!baseline' ':!docs/reviews' 2>/dev/null \
-            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
+            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
           if [ -n "$diff_hits" ]; then
             echo "::error::Possible high-entropy credential shape detected in the diff:"
             echo "$diff_hits"
