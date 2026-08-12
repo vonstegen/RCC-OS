@@ -1,19 +1,22 @@
 name: upstream-deterministic
 
-# Runs the upstream ResonantOS deterministic verification suite against
-# the in-tree baseline/ snapshot, so we detect divergence from
-# ResonantOS/2.0.0-alpha @ dev as early as possible. Additive to (not
-# a replacement for) the upstream workflow. Action refs are pinned to
-# 40-char commit SHAs.
+# Runs the upstream ResonantOS deterministic test suite against the
+# in-tree baseline/ snapshot. Detects divergence from
+# ResonantOS/2.0.0-alpha @ dev as early as possible.
+#
+# This workflow is strict on tests. Dependency-advisory status is
+# reported separately by upstream-advisories and is not gating here.
+# Additive to (not a replacement for) the upstream workflow.
+# Action refs are pinned to 40-char commit SHAs.
 
 permissions:
   contents: read
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
   schedule:
     # Weekly Monday 06:17 UTC; complements PR-time verification.
     - cron: "17 6 * * 1"
@@ -45,14 +48,6 @@ jobs:
       - name: Install browser host dependencies
         working-directory: baseline
         run: npm ci --prefix addons/resonant-browser-host
-
-      - name: Audit root dependencies
-        working-directory: baseline
-        run: npm audit --audit-level=high
-
-      - name: Audit browser host dependencies
-        working-directory: baseline
-        run: npm audit --prefix addons/resonant-browser-host --audit-level=high
 
       - name: Verify Alpha (deterministic suite)
         working-directory: baseline

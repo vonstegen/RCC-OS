@@ -10,6 +10,10 @@ SOURCES   := $(wildcard sections/*.tex) preamble.tex
 BUILDDIR  := build
 PDF       := $(BUILDDIR)/$(DOC).pdf
 
+# TEXINPUTS so pdflatex finds classes/, sections/, refs/. The
+# trailing colon preserves the system default search path.
+export TEXINPUTS := $(CURDIR)/classes:$(CURDIR)/sections:$(CURDIR):$(TEXINPUTS)
+
 .PHONY: all clean distclean help spelling watch
 
 all: $(PDF)
