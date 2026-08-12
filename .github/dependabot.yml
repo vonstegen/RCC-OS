@@ -1,0 +1,55 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/baseline"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      prefix-security: "deps(sec)"
+    labels:
+      - "dependencies"
+    # baseline/ is a read-only snapshot. Dependabot opens PRs
+    # against the upstream-sync/<date> topic branch on develop;
+    # the lab maintainer curates which ones to include in the
+    # next refresh. Branches from upstream-sync/* are allowed by
+    # the gitflow policy.
+    target-branch: "develop"
+    # Restrict to patch + minor for lab-authored dependencies
+    # to avoid the surprise of a major-version upgrade in a
+    # snapshot refresh.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "npm"
+    directory: "/baseline/addons/resonant-browser-host"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(addon)"
+    target-branch: "develop"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "ci"
+    target-branch: "develop"
+    groups:
+      github-actions:
+        applies-to: version-updates
+        patterns: ["*"]
