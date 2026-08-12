@@ -7,7 +7,7 @@
 
 \LoadClass[11pt,a4paper,oneside,openany]{book}
 
-\RequirePackage[a4paper,margin=1in]{geometry}
+\RequirePackage[a4paper,margin=1in,headheight=15pt]{geometry}
 \RequirePackage{parskip}
 \RequirePackage[svgnames]{xcolor}
 \definecolor{rccosAccent}{HTML}{1B4F8C}

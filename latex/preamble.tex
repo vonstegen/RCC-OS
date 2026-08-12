@@ -15,6 +15,29 @@
 \usepackage{array}
 \usepackage{enumitem}
 \usepackage{listings}
+
+% Define a JSON listing language for the Cognitive Core examples.
+\lstdefinelanguage{rccosjson}{
+  showstringspaces=false,
+  breaklines=true,
+  literate=
+    *{\{}{{{\{}}}{1}
+    {\}}{{{\}}}}{1}
+    {[}{{{[}}}{1}
+    {]}{{{]}}}{1},
+  morestring=[b]",
+  morecomment=[l]{//},
+  morekeywords={true,false,null},
+}
+
+% Define a shell language for the bash listings.
+\lstdefinelanguage{rccossh}{
+  morekeywords={make,git,npm,node,cargo,pdflatex,latexmk,biber},
+  sensitive=true,
+  morecomment=[l]{\#},
+  morestring=[b]",
+}
+
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!60!black,citecolor=blue!50!black]{hyperref}

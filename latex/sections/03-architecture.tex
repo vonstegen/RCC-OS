@@ -81,7 +81,7 @@ availability & probability the provider is reachable at request time \\
 
 The Cognitive Core handles structured requests like:
 
-\begin{lstlisting}[language=json,caption={Example request to the Cognitive Core.}]
+\begin{lstlisting}[language=rccosjson,caption={Example request to the Cognitive Core.}]
 {
   "task": "route",
   "input": "Open the budget spreadsheet and summarize it",
@@ -93,7 +93,7 @@ The Cognitive Core handles structured requests like:
 
 and returns:
 
-\begin{lstlisting}[language=json,caption={Example response from the Cognitive Core.}]
+\begin{lstlisting}[language=rccosjson,caption={Example response from the Cognitive Core.}]
 {
   "intent": "summarize_document",
   "capabilities": ["filesystem.read", "spreadsheet.inspect"],
