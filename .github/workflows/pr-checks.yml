@@ -52,12 +52,15 @@ jobs:
             echo "::error::Delete the local file; it is in .gitignore on purpose."
             exit 1
           fi
-          # Check 3: high-entropy credential shapes in the diff. Only
-          # runs on lab-authored files (outside baseline/) so upstream
-          # test fixtures do not false-positive.
+          # Check 3: high-entropy credential shapes in the diff. Skip
+          # baseline/ (upstream test fixtures like
+          # sk-EXAMPLEEXAMPLEEXAMPLE are deliberately present there) and
+          # docs/reviews/ (the audit reports themselves quote those
+          # fixtures).
           base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
-          diff_hits=$(git diff "$base"..HEAD --diff-filter=ACMRT -- . ':!baseline' 2>/dev/null \
-            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
+          diff_hits=$(git diff "$base"..HEAD --diff-filter=ACMRT \
+            -- . ':!baseline' ':!docs/reviews' 2>/dev/null \
+            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
           if [ -n "$diff_hits" ]; then
             echo "::error::Possible high-entropy credential shape detected in the diff:"
             echo "$diff_hits"
@@ -68,10 +71,10 @@ jobs:
       - name: Reject large diff blobs
         run: |
           # Threshold: 256KB per file. The intent is to catch accidentally
-          # committed binary blobs or generated artifacts, not to gate
-          # on prose length. Prior versions used `git diff --numstat`
-          # which reports line counts here, leading to false positives
-          # for long-form documents.
+          # committed binary blobs or generated artifacts, not to gate on
+          # prose length. Prior versions used `git diff --numstat` which
+          # reports line counts in this configuration, leading to false
+          # positives for long-form documents.
           base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
           max_bytes=$((256 * 1024))
           files=$(git diff --name-only --diff-filter=ACMRT "$base"..HEAD)
