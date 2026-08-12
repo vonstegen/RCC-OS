@@ -216,3 +216,50 @@ jobs:
               exit 1
             fi
           done
+
+  bridge-policy:
+    name: Bridge policy conformance (ADR-0005)
+    # ADR-0005 is the lab's policy; the code change is upstream's.
+    # This check is the lab's drift detector. Until upstream merges
+    # the policy (see docs/reviews/2026-08-12-bridge-policy-upstream.md),
+    # the baseline/ file is non-compliant; the check logs a warning
+    # rather than blocking. Promote to blocking once the upstream
+    # patch lands and the lab's baseline/ snapshot is refreshed.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Verify bridge loopback exemption and LAN startup guard policy
+        run: |
+          # ADR-0005: the baseline/ bridge server must (a) default
+          # the loopback open-path exemption to [/hermes-dashboard]
+          # only and (b) refuse to start on a non-loopback bind with
+          # an empty IP allowlist. The lab is the policy author; the
+          # code change is upstream's. This check is the lab's drift
+          # detector for upstream's adoption of the policy.
+          target="baseline/browser-first/host/bridge-server.mjs"
+          if [ ! -f "$target" ]; then
+            echo "::error::ADR-0005: $target not found."
+            exit 1
+          fi
+          broken=""
+          # (a) loopback exemption default is /hermes-dashboard.
+          if ! grep -q 'return \["/hermes-dashboard"\]' "$target" && \
+             ! grep -q "return \['/hermes-dashboard'\]" "$target"; then
+            broken="$broken\n$target does not default the loopback open-path exemption to [/hermes-dashboard] (ADR-0005 Tier 1)."
+          fi
+          if grep -E 'DASHBOARD_PROXY_MIRROR_PATHS\.map\(\(entry\) => entry\.bridge\)' "$target" | grep -v -E '^\s*//' > /dev/null; then
+            broken="$broken\n$target still maps the full DASHBOARD_PROXY_MIRROR_PATHS list into the default open-path exemption (should be [/hermes-dashboard] only)."
+          fi
+          # (b) startBridgeServer refuses to start on a non-loopback
+          # bind with empty allowedCidrs.
+          if ! grep -q 'BRIDGE_REFUSE_LAN_NO_CIDRS' "$target"; then
+            broken="$broken\n$target does not refuse to start on a non-loopback bind with empty allowedCidrs (ADR-0005 Tier 2)."
+          fi
+          if [ -n "$broken" ]; then
+            echo "::warning::ADR-0005: bridge policy drift in $target:"
+            printf '%b' "$broken"
+            echo "::warning::See docs/reviews/2026-08-12-bridge-policy-upstream.md for the proposed upstream patch."
+            exit 1
+          fi
