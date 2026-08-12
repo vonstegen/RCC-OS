@@ -6,7 +6,9 @@ alternatives considered, and the consequences.
 
 | Number | Title | Status |
 | --- | --- | --- |
+| [0001](0001-resonant-core-in-rust.md) | Resonant Core is implemented in Rust | Proposed |
 | [0002](0002-self-review-on-main.md) | Main-branch self-review is permitted for lab release cuts | Accepted |
+| [0004](0004-upstream-suite-parity.md) | Upstream-suite parity policy for the lab | Proposed |
 
 ## Process
 

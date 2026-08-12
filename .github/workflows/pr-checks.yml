@@ -36,30 +36,68 @@ jobs:
 
       - name: Block generated credentials
         run: |
-          if git ls-files | grep -E '(bridge-config\.generated\.js|\.env($|\.)|BridgeTLS/ResonantOS_User/)'; then
-            echo "::error::Tracked files appear to contain generated credentials or runtime state."
+          # Check 1: tracked file names. Catches `git add -f <name>`
+          # where the contributor forced an ignored file into the index.
+          if git ls-files | grep -E '(^|/)bridge-config\.generated\.js$|(^|/)\.env($|\.)|BridgeTLS/ResonantOS_User/'; then
+            echo "::error::Tracked file appears to be a generated credential or runtime state artifact."
+            echo "::error::These names are .gitignore-excluded by design; do not force-add them."
+            exit 1
+          fi
+          # Check 2: working-tree presence. Catches the case where a
+          # generated file is in the working tree but never staged.
+          wt_hits=$(git ls-files --others --exclude-standard 2>/dev/null | grep -E '(^|/)bridge-config\.generated\.js$|(^|/)\.env($|\.)|BridgeTLS/ResonantOS_User/' || true)
+          if [ -n "$wt_hits" ]; then
+            echo "::error::Generated credential or runtime state artifact present in working tree but not staged:"
+            echo "$wt_hits"
+            echo "::error::Delete the local file; it is in .gitignore on purpose."
+            exit 1
+          fi
+          # Check 3: high-entropy credential shapes in the diff. Skip
+          # baseline/ (upstream test fixtures like
+          # sk-EXAMPLEEXAMPLEEXAMPLE are deliberately present there) and
+          # docs/reviews/ (the audit reports themselves quote those
+          # fixtures).
+          base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
+          diff_hits=$(git diff "$base"..HEAD --diff-filter=ACMRT \
+            -- . ':!baseline' ':!docs/reviews' 2>/dev/null \
+            | grep -nE 'ghp_[A-Za-z0-9]{30,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}' || true)
+          if [ -n "$diff_hits" ]; then
+            echo "::error::Possible high-entropy credential shape detected in the diff:"
+            echo "$diff_hits"
+            echo "::error::If this is a test fixture, use a clearly fake value like 'sk-EXAMPLEEXAMPLEEXAMPLE'."
             exit 1
           fi
 
       - name: Reject large diff blobs
         run: |
+          # Threshold: 256KB per file. The intent is to catch accidentally
+          # committed binary blobs or generated artifacts, not to gate on
+          # prose length. Prior versions used `git diff --numstat` which
+          # reports line counts in this configuration, leading to false
+          # positives for long-form documents.
           base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
-          max_kb=512
-          bad=$(git diff --numstat "$base"..HEAD \
-            | awk -v max="$max_kb" '{ if ($1 > max || $2 > max) print $3 }' || true)
+          max_bytes=$((256 * 1024))
+          files=$(git diff --name-only --diff-filter=ACMRT "$base"..HEAD)
+          bad=""
+          for f in $files; do
+            if [ -f "$f" ]; then
+              size=$(wc -c < "$f" | tr -d ' ')
+              if [ "$size" -gt "$max_bytes" ]; then
+                bad="$bad\n$f: ${size} bytes (max ${max_bytes})"
+              fi
+            fi
+          done
           if [ -n "$bad" ]; then
-            echo "::error::Files exceeding ${max_kb}KB changed in a single line:"
-            echo "$bad"
+            echo "::error::Files exceeding 256KB added in this PR:"
+            printf '%b' "$bad"
             exit 1
           fi
 
       - name: Trailing-whitespace check
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
-          # Show every file touched in the range and grep for trailing
-          # spaces. git diff --check 2.54 changed behavior in subtle
-          # ways; this explicit grep is deterministic and reports
-          # which file and line is offending.
+          # Explicit grep instead of `git diff --check`, whose behavior
+          # changed in git 2.54 in ways that produce inconsistent results.
           files=$(git diff --name-only --diff-filter=ACMRT "$base"..HEAD)
           bad=""
           for f in $files; do
@@ -108,6 +146,32 @@ jobs:
               exit 1
             fi
           done
+      - name: Verify ADR parity between decisions/ and the LaTeX decisions section
+        run: |
+          # Every ADR under docs/decisions/ must be enumerated in
+          # docs/decisions/README.md AND in latex/sections/05-decisions.tex.
+          # This is the cheap drift detector for F-01 / F-03.
+          adrs=$(ls docs/decisions/[0-9][0-9][0-9][0-9]-*.md 2>/dev/null | grep -v '/README.md$' || true)
+          if [ -z "$adrs" ]; then
+            echo "::error::No ADR files found under docs/decisions/."
+            exit 1
+          fi
+          missing=""
+          for f in $adrs; do
+            base=$(basename "$f" .md)
+            num=$(echo "$base" | grep -oE '^[0-9]{4}')
+            if ! grep -q "\[$num\]" docs/decisions/README.md; then
+              missing="$missing $f (not in docs/decisions/README.md)"
+            fi
+            if ! grep -q "\\\\adr{$num}" latex/sections/05-decisions.tex; then
+              missing="$missing $f (not in latex/sections/05-decisions.tex)"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::ADR parity broken. Missing from one or both index surfaces:"
+            echo "$missing"
+            exit 1
+          fi
 
   latex-presence:
     name: LaTeX scaffold presence

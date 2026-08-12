@@ -67,6 +67,10 @@ align with the staged-experiment structure recorded in
   [`.github/workflows/pr-checks.yml`](../.github/workflows/pr-checks.yml)
   and the upstream deterministic suite in
   [`.github/workflows/upstream-deterministic.yml`](../.github/workflows/upstream-deterministic.yml).
+  The gate list is a lab-adjusted subset of upstream
+  `verify:alpha`; see
+  [ADR-0004](../decisions/0004-upstream-suite-parity.md) for the
+  drop and re-enable conditions.
 - Squash-merge is the default. Merge commits are permitted only on
   `release/*` and `hotfix/*` PRs to preserve the topology described
   above.
