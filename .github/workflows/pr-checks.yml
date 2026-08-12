@@ -55,8 +55,24 @@ jobs:
 
       - name: Trailing-whitespace check
         run: |
-          if git diff --check "${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"..HEAD; then
-            echo "::error::Trailing whitespace detected."
+          base="${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}"
+          # Show every file touched in the range and grep for trailing
+          # spaces. git diff --check 2.54 changed behavior in subtle
+          # ways; this explicit grep is deterministic and reports
+          # which file and line is offending.
+          files=$(git diff --name-only --diff-filter=ACMRT "$base"..HEAD)
+          bad=""
+          for f in $files; do
+            if [ -f "$f" ]; then
+              ws=$(grep -nE ' +$' "$f" || true)
+              if [ -n "$ws" ]; then
+                bad="$bad\n$f:\n$ws\n"
+              fi
+            fi
+          done
+          if [ -n "$bad" ]; then
+            echo "::error::Trailing whitespace detected:"
+            printf '%b' "$bad"
             exit 1
           fi
 
