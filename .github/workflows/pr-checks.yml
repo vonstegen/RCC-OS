@@ -172,6 +172,40 @@ jobs:
             echo "$missing"
             exit 1
           fi
+      - name: Verify docs/ <-> latex/sections/ source-of-truth parity
+        run: |
+          # Every docs/*.md file (excluding index files) must claim at
+          # least one latex/sections/NN-*.tex file as 'Source of
+          # truth' in its comments, AND every latex/sections/*.tex
+          # file that names a docs/*.md as 'Source of truth' must
+          # have that file exist. Bidirectional.
+          broken=""
+          # Forward: docs/*.md -> claimed LaTeX section.
+          for md in docs/VISION.md docs/MILESTONES.md docs/ARCHITECTURE.md docs/WORKFLOW.md; do
+            if [ ! -f "$md" ]; then
+              continue
+            fi
+            base=$(basename "$md" .md)
+            claimed=$(grep -E 'latex/sections/[0-9]+-[A-Za-z_-]*\.tex' "$md" 2>/dev/null \
+              | grep -oE 'latex/sections/[0-9]+-[A-Za-z_-]*\.tex' || true)
+            if [ -z "$claimed" ]; then
+              broken="$broken\n$md does not name a latex/sections/ counterpart in its content."
+            fi
+          done
+          # Reverse: latex/sections/*.tex that names a docs/*.md as
+          # Source of truth must reference an existing file.
+          for tex in latex/sections/*.tex; do
+            src=$(echo "$tex" | grep -oE 'docs/[A-Za-z0-9_./-]+\.md' || true)
+            if [ -n "$src" ] && [ ! -f "$src" ]; then
+              broken="$broken\n$tex names $src as Source of truth but that file does not exist."
+            fi
+          done
+          if [ -n "$broken" ]; then
+            echo "::error::docs/ <-> latex/sections/ parity broken:"
+            printf '%b' "$broken"
+            exit 1
+          fi
+
 
   latex-presence:
     name: LaTeX scaffold presence
